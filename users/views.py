@@ -2,6 +2,10 @@
 from django.shortcuts import render, redirect
 from .forms import UserRegisterForm
 from django.contrib import messages
+from django.http import HttpResponse
+
+#def home(request):
+#    return HttpResponse("Welcome to the Home Page")
 
 def register(request):
     if request.method == 'POST':
