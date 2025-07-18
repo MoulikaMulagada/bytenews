@@ -1,35 +1,40 @@
-# news/views.py 
-from django.views.generic import ListView ,DetailView
-from .models import Article, Category # Category will be useful soon 
-
-from django.shortcuts import render
+from django.views.generic import ListView, DetailView
 from django.http import HttpResponse
-
+from django.db.models import Q, Count
+from .models import Article, Category
 
 def home(request):
     return HttpResponse("<h1>Welcome to NewsGenie AI</h1>")
-class ArticleListView(ListView): 
-    def get_queryset(self): 
-        queryset = super().get_queryset() # Start with all articles 
-        category_name = self.request.GET.get('category') # Check if 'category' parameter 
 
-        if category_name: 
-            # Filter articles by category name (case-insensitive) 
-            queryset = queryset.filter(categories__name__iexact=category_name) 
-        return queryset 
- 
-    def get_context_data(self, **kwargs): 
-        context = super().get_context_data(**kwargs) 
-        context['categories'] = Category.objects.all().order_by('name') # Get all categories 
+class ArticleListView(ListView):
+    model = Article
+    template_name = 'news/article_list.html'
+    context_object_name = 'articles'
+    ordering = ['-published_date']
+    paginate_by = 10
 
-        context['current_category'] = self.request.GET.get('category', 'All') 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        category_name = self.request.GET.get('category')
+        query = self.request.GET.get('q')
+
+        if category_name:
+            queryset = queryset.filter(categories__name__iexact=category_name)
+        if query:
+            queryset = queryset.filter(
+                Q(title__icontains=query) | Q(content__icontains=query)
+            )
+
+        return queryset.distinct()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['categories'] = Category.objects.annotate(article_count=Count('article')).order_by('name')
+        context['search_query'] = self.request.GET.get('q', '')
+        context['current_category'] = self.request.GET.get('category', 'All')
         return context
-    model = Article # Tell ListView which model to work with 
-    template_name = 'news/article_list.html' # The template to render 
-    context_object_name = 'articles' # The variable name to use in the template 
-    ordering = ['-publication_date'] # Order articles by most recent first 
-    paginate_by = 10 
-class ArticleDetailView(DetailView): 
-    model = Article 
-    template_name = 'news/article_detail.html' 
-    context_object_name = 'article' # The variable name to use in the template
+
+class ArticleDetailView(DetailView):
+    model = Article
+    template_name = 'news/article_detail.html'
+    context_object_name = 'article'
