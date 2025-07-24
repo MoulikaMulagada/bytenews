@@ -1,0 +1,108 @@
+/* Reset and base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #c084fc, #a78bfa);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Navbar */
+.navbar {
+  padding: 20px 0;
+  text-align: center;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar a {
+  margin: 0 20px;
+  text-decoration: none;
+  color: #4f46e5;
+  font-weight: bold;
+}
+
+.navbar a:hover {
+  text-decoration: underline;
+}
+
+/* Welcome heading */
+.form-wrapper h2 {
+  font-size: 28px;
+  margin-bottom: 10px;
+  background: linear-gradient(90deg, #6d28d9, #9333ea);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: bold;
+}
+
+/* Form container */
+.form-wrapper {
+  margin-top: 50px;
+}
+
+.form-container {
+  background-color: white;
+  padding: 30px 25px;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
+  max-width: 400px;
+  width: 100%;
+  text-align: left;
+}
+
+/* Form labels and inputs */
+form label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+form input[type="text"],
+form input[type="password"],
+form input[type="email"] {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+form input[type="submit"],
+form button {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(90deg, #7c3aed, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+form input[type="submit"]:hover,
+form button:hover {
+  background: linear-gradient(90deg, #6d28d9, #7c3aed);
+}
+
+/* Footer */
+.footer {
+  margin-top: auto;
+  padding: 20px;
+  font-size: 13px;
+  color: #fff;
+  text-align: center;
+  opacity: 0.85;
+}
