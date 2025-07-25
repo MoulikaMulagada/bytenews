@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from news.utils import fetch_news_from_rss
 from news.models import Article, Category
 import logging
-
+from news.utils import generate_summary
 logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
@@ -37,12 +37,14 @@ class Command(BaseCommand):
                     general_category, _ = Category.objects.get_or_create(name='General')
 
                     if not Article.objects.filter(link=article_data['link']).exists():
+                        article_summary = generate_summary(article_data['content']) # Call your new function 
                         article = Article.objects.create(
                             title=article_data['title'],
                             content=article_data['content'],
                             publication_date=article_data['publication_date'],
                             author=article_data.get('source', 'Unknown'),
-                            link=article_data['link']
+                            link=article_data['link'],
+                            summary=article_summary # Save the summary
                         )
                         article.categories.add(general_category)
                         articles_added_from_source += 1
