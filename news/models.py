@@ -1,7 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-
+from django.contrib.auth import get_user_model 
+User = get_user_model() # Get the currently active User model 
 class Category(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
@@ -15,7 +16,6 @@ class Category(models.Model):
 class Article(models.Model):
     title = models.CharField(max_length=200)
     content = models.TextField()
-    summary = models.TextField(blank=True)
     source_url = models.URLField()
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
     published_date = models.DateTimeField(default=timezone.now)
@@ -27,6 +27,7 @@ class Article(models.Model):
     link = models.URLField(max_length=500, unique=True, null=True, blank=True) 
     source = models.CharField(max_length=100, default='Unknown') 
     categories = models.ManyToManyField('Category', related_name='multi_articles') 
+    summary = models.TextField(blank=True, null=True)
     def _str_(self):  # ✅ fixed
         return self.title
 
@@ -53,3 +54,14 @@ class ReadingHistory(models.Model):
         unique_together = ('user', 'article')
     def _str_(self):  # ✅ fixed
         return f"{self.user.username} read {self.article.title}"
+class SummaryFeedback(models.Model): 
+    user = models.ForeignKey(User, on_delete=models.CASCADE) 
+    article = models.ForeignKey(Article, on_delete=models.CASCADE) 
+    is_helpful = models.BooleanField() # True for helpful, False for not helpful 
+    feedback_date = models.DateTimeField(auto_now_add=True) 
+    class Meta: 
+    # Ensures a user can only leave one feedback per article 
+        unique_together = ('user', 'article')  
+        verbose_name_plural = "Summary Feedback" 
+    def __str__(self): 
+        return f"{self.user.username} - {self.article.title[:30]} - Helpful: {self.is_helpful}" 

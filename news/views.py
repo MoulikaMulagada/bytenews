@@ -1,12 +1,14 @@
 from django.views.generic import ListView, DetailView
-from django.shortcuts import render, get_object_or_404
-from django.http import HttpResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import HttpResponse, JsonResponse
 from django.db.models import Q, Count
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
-from .models import Article, Category, UserPreference, ReadingHistory
+from .models import Article, Category, UserPreference, ReadingHistory, SummaryFeedback
+from .utils import generate_summary
 
 
 def home(request):
@@ -19,7 +21,6 @@ class ArticleListView(ListView):
     context_object_name = 'articles'
     ordering = ['-published_date']
     paginate_by = 10
-    queryset = Article.objects.order_by('-published_date')
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -28,12 +29,12 @@ class ArticleListView(ListView):
 
         # Filter by category
         if category_name and category_name.lower() != 'all':
-            queryset = queryset.filter(category_name_iexact=category_name)
+            queryset = queryset.filter(category__name__iexact=category_name)
 
         # Search by title or content
         if query:
             queryset = queryset.filter(
-                Q(title_icontains=query) | Q(content_icontains=query)
+                Q(title__icontains=query) | Q(content__icontains=query)
             )
 
         # Personalized feed
@@ -44,7 +45,6 @@ class ArticleListView(ListView):
                     if hasattr(self.request.user, 'userpreference')
                     else Category.objects.none()
                 )
-
                 if user_preferences.exists():
                     queryset = queryset.filter(category__in=user_preferences)
                     messages.info(self.request, "Showing articles based on your preferences.")
@@ -62,7 +62,7 @@ class ArticleListView(ListView):
         context['search_query'] = self.request.GET.get('q', '')
         context['recommendations'] = []
 
-        # Recommendation system
+        # Recommendations
         if self.request.user.is_authenticated:
             try:
                 user_preferences = (
@@ -97,17 +97,48 @@ class ArticleDetailView(DetailView):
         # Track reading history
         if self.request.user.is_authenticated:
             ReadingHistory.objects.update_or_create(
-    user=self.request.user,
-    article=obj,
-    defaults={'timestamp': timezone.now()}
-)
-
-
+                user=self.request.user,
+                article=obj,
+                defaults={'timestamp': timezone.now()}
+            )
         return obj
 
 
 @login_required
 def reading_history_view(request):
     history = ReadingHistory.objects.filter(user=request.user).select_related('article').order_by('-timestamp')
-
     return render(request, 'news/reading_history.html', {'history': history})
+
+
+@login_required
+@require_POST
+def submit_summary_feedback(request, pk):
+    article = get_object_or_404(Article, pk=pk)
+    is_helpful = request.POST.get('is_helpful')
+
+    if is_helpful is not None:
+        is_helpful_bool = (is_helpful.lower() == 'true')
+
+        SummaryFeedback.objects.update_or_create(
+            user=request.user,
+            article=article,
+            defaults={'is_helpful': is_helpful_bool}
+        )
+        messages.success(request, 'Thank you for your feedback!')
+
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success', 'helpful': is_helpful_bool})
+        else:
+            return redirect('news:detail', pk=pk)
+
+    messages.error(request, 'Invalid feedback provided.')
+    return redirect('news:detail', pk=pk)
+
+
+@login_required
+def generate_summary_view(request, pk):
+    article = get_object_or_404(Article, pk=pk)
+    article.summary = generate_summary(article.content)
+    article.save()
+    messages.success(request, "Summary generated successfully!")
+    return redirect('news:detail', pk=pk)
