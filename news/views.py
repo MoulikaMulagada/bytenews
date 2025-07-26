@@ -1,11 +1,12 @@
 from django.views.generic import ListView, DetailView
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, Http404
 from django.db.models import Q, Count
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import Article, Category, UserPreference, ReadingHistory, SummaryFeedback
 from .utils import generate_summary
@@ -23,21 +24,18 @@ class ArticleListView(ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().filter(approved=True)
         category_name = self.request.GET.get('category')
         query = self.request.GET.get('q')
 
-        # Filter by category
         if category_name and category_name.lower() != 'all':
             queryset = queryset.filter(category__name__iexact=category_name)
 
-        # Search by title or content
         if query:
             queryset = queryset.filter(
                 Q(title__icontains=query) | Q(content__icontains=query)
             )
 
-        # Personalized feed
         if self.request.user.is_authenticated:
             try:
                 user_preferences = (
@@ -62,7 +60,6 @@ class ArticleListView(ListView):
         context['search_query'] = self.request.GET.get('q', '')
         context['recommendations'] = []
 
-        # Recommendations
         if self.request.user.is_authenticated:
             try:
                 user_preferences = (
@@ -94,13 +91,18 @@ class ArticleDetailView(DetailView):
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
 
-        # Track reading history
+        # Block unapproved article access for regular users
+        if not obj.approved and not self.request.user.is_staff:
+            raise Http404("Article not found or not yet approved.")
+
+        # Save reading history for logged-in users
         if self.request.user.is_authenticated:
             ReadingHistory.objects.update_or_create(
                 user=self.request.user,
                 article=obj,
                 defaults={'timestamp': timezone.now()}
             )
+
         return obj
 
 
@@ -129,16 +131,25 @@ def submit_summary_feedback(request, pk):
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'status': 'success', 'helpful': is_helpful_bool})
         else:
-            return redirect('news:detail', pk=pk)
+            return redirect('news:article_detail', pk=pk)
 
     messages.error(request, 'Invalid feedback provided.')
-    return redirect('news:detail', pk=pk)
+    return redirect('news:article_detail', pk=pk)
 
 
+# ✅ Final working version for summary button (fetch POST → JSON response)
 @login_required
+@csrf_exempt  # ✅ Only for development; use CSRF token in production
+@require_POST
 def generate_summary_view(request, pk):
     article = get_object_or_404(Article, pk=pk)
-    article.summary = generate_summary(article.content)
-    article.save()
-    messages.success(request, "Summary generated successfully!")
-    return redirect('news:detail', pk=pk)
+
+    try:
+        summary = generate_summary(article.content, article.title)  # Always generate fresh
+        return JsonResponse({
+            'summary': summary
+        })
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
